@@ -3,29 +3,9 @@ import { campaigns } from "@/server/db/schema";
 import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Send } from "lucide-react";
-import { format } from "date-fns";
-
-const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  draft: "secondary",
-  pending_review: "outline",
-  approved: "default",
-  scheduled: "default",
-  sending: "default",
-  sent: "default",
-  changes_requested: "destructive",
-  cancelled: "destructive",
-};
+import { CampaignsTable } from "@/components/dashboard/campaigns-table";
 
 export default async function CampaignsPage() {
   let campaignList: (typeof campaigns.$inferSelect)[] = [];
@@ -67,49 +47,15 @@ export default async function CampaignsPage() {
               </Link>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaignList.map((campaign) => (
-                  <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/dashboard/campaigns/${campaign.id}`}
-                        className="hover:underline"
-                      >
-                        {campaign.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {campaign.subjectLine || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[campaign.status] ?? "secondary"}>
-                        {campaign.status.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(campaign.createdAt), "MMM d, yyyy")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/dashboard/campaigns/${campaign.id}`}>
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <CampaignsTable
+              campaigns={campaignList.map((c) => ({
+                id: c.id,
+                name: c.name,
+                subjectLine: c.subjectLine,
+                status: c.status,
+                createdAt: c.createdAt,
+              }))}
+            />
           )}
         </CardContent>
       </Card>

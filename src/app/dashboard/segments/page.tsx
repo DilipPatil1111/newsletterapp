@@ -3,9 +3,9 @@ import { segments } from "@/server/db/schema";
 import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Users } from "lucide-react";
+import { SegmentsGrid } from "@/components/dashboard/segments-grid";
 
 export default async function SegmentsPage() {
   let segmentList: (typeof segments.$inferSelect)[] = [];
@@ -45,42 +45,15 @@ export default async function SegmentsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {segmentList.map((segment) => {
-            const filters = segment.filters as Record<string, string>;
-            return (
-              <Link
-                key={segment.id}
-                href={`/dashboard/segments/${segment.id}`}
-              >
-                <Card className="transition-shadow hover:shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{segment.name}</CardTitle>
-                    {segment.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {segment.description}
-                      </p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(filters).map(([key, val]) =>
-                        val ? (
-                          <Badge key={key} variant="secondary">
-                            {key}: {val}
-                          </Badge>
-                        ) : null
-                      )}
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      ~{segment.estimatedSize} contacts
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
+        <SegmentsGrid
+          segments={segmentList.map((s) => ({
+            id: s.id,
+            name: s.name,
+            description: s.description,
+            filters: (s.filters || {}) as Record<string, string>,
+            estimatedSize: s.estimatedSize ?? 0,
+          }))}
+        />
       )}
     </div>
   );

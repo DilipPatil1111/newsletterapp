@@ -24,12 +24,16 @@ import {
   Settings,
   Mail,
   PlusCircle,
+  FileText,
+  Filter,
 } from "lucide-react";
 
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Create Newsletter", href: "/dashboard/newsletters/create", icon: PlusCircle },
   { title: "Contacts", href: "/dashboard/contacts", icon: Users },
+  { title: "Segments", href: "/dashboard/segments", icon: Filter },
+  { title: "Templates", href: "/dashboard/templates", icon: FileText },
   { title: "Campaigns", href: "/dashboard/campaigns", icon: Send },
   { title: "Schedules", href: "/dashboard/schedules", icon: Calendar },
   { title: "Reports", href: "/dashboard/reports", icon: BarChart3 },

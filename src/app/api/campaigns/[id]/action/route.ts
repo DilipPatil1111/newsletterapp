@@ -8,9 +8,10 @@ import {
   sendRecipients,
   suppressionList,
 } from "@/server/db/schema";
-import { eq, and, ilike, count, notInArray, SQL } from "drizzle-orm";
+import { eq, and, ilike, notInArray, SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { renderEmail, campaignContentToBlocks } from "@/lib/email-renderer";
 
 export async function POST(
   req: Request,
@@ -65,12 +66,20 @@ export async function POST(
 
       const resend = new Resend(process.env.RESEND_API_KEY);
       const content = campaign.content as Record<string, string> | null;
+      const blocks = campaignContentToBlocks(content);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+      const html = await renderEmail({
+        subject: campaign.subjectLine || "Newsletter",
+        blocks,
+        appUrl,
+      });
 
       await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
         to: ["delivered@resend.dev"],
         subject: `[TEST] ${campaign.subjectLine || "Newsletter"}`,
-        html: buildEmailHtml(campaign.subjectLine || "", content),
+        html,
       });
 
       return NextResponse.json({ success: true });
@@ -89,30 +98,39 @@ export async function POST(
         .set({ status: "sending", updatedAt: new Date() })
         .where(eq(campaigns.id, campaignId));
 
-      const recipientEmails = await getSegmentContacts(campaign.segmentId);
+      const recipientContacts = await getSegmentContacts(campaign.segmentId);
+      const content = campaign.content as Record<string, string> | null;
+      const blocks = campaignContentToBlocks(content);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
       const [job] = await db
         .insert(sendJobs)
         .values({
           campaignId,
           status: "processing",
-          totalRecipients: recipientEmails.length,
+          totalRecipients: recipientContacts.length,
           startedAt: new Date(),
         })
         .returning();
 
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const content = campaign.content as Record<string, string> | null;
       let sentCount = 0;
       let failedCount = 0;
 
-      for (const contact of recipientEmails) {
+      for (const contact of recipientContacts) {
         try {
+          const html = await renderEmail({
+            subject: campaign.subjectLine || "Intellee Newsletter",
+            recipientEmail: contact.email,
+            blocks,
+            appUrl,
+          });
+
           const result = await resend.emails.send({
             from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
             to: [contact.email],
             subject: campaign.subjectLine || "Intellee Newsletter",
-            html: buildEmailHtml(campaign.subjectLine || "", content),
+            html,
           });
 
           await db.insert(sendRecipients).values({
@@ -204,40 +222,15 @@ async function getSegmentContacts(segmentId: string | null) {
       .from(suppressionList);
     suppressed = suppressedRows.map((r) => r.email);
   } catch {
-    // suppression list may not exist
+    // suppression list may not exist yet
   }
 
-  let query = db
+  if (suppressed.length > 0) {
+    conditions.push(notInArray(contacts.email, suppressed));
+  }
+
+  return db
     .select({ id: contacts.id, email: contacts.email })
     .from(contacts)
     .where(and(...conditions));
-
-  return query;
-}
-
-function buildEmailHtml(
-  subject: string,
-  content: Record<string, string> | null
-) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8" /></head>
-    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9fafb;">
-      <div style="background: white; border-radius: 8px; padding: 32px; border: 1px solid #e5e7eb;">
-        <h1 style="color: #111827; font-size: 24px; margin-bottom: 16px;">${subject}</h1>
-        ${content?.intro ? `<p style="color: #374151; font-size: 16px; line-height: 1.6;">${content.intro}</p>` : ""}
-        ${content?.highlights ? `<div style="background: #f3f4f6; padding: 16px; border-radius: 6px; margin: 16px 0;"><p style="color: #374151; font-size: 14px; line-height: 1.6;">${content.highlights}</p></div>` : ""}
-        ${content?.ctaUrl ? `<a href="${content.ctaUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 16px;">${content.ctaText || "Learn More"}</a>` : ""}
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-        <p style="color: #9ca3af; font-size: 12px;">
-          Intellee College Newsletter<br />
-          <a href="${appUrl}/unsubscribe" style="color: #9ca3af;">Unsubscribe</a>
-        </p>
-      </div>
-    </body>
-    </html>
-  `;
 }

@@ -326,6 +326,81 @@ export const suppressionList = pgTable("suppression_list", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Brand Settings ─────────────────────────────────────────
+
+export const brandSettings = pgTable("brand_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  businessSlug: varchar("business_slug", { length: 100 }).default("intellee_college"),
+  companyName: varchar("company_name", { length: 300 }).default("Intellee College").notNull(),
+  logoUrl: text("logo_url"),
+  brandLibraryUrls: jsonb("brand_library_urls").default([]),
+  primaryColor: varchar("primary_color", { length: 20 }).default("#1E1B4B").notNull(),
+  accentColor: varchar("accent_color", { length: 20 }).default("#4338CA").notNull(),
+  fontFamily: varchar("font_family", { length: 200 }).default("Georgia, 'Times New Roman', Times, serif"),
+  address: text("address").default("Tech Park, Bangalore, India"),
+  phone: varchar("phone", { length: 30 }).default("+91 98765 43210"),
+  websiteUrl: text("website_url").default("https://intellee.com"),
+  contactEmail: varchar("contact_email", { length: 320 }).default("admissions@intellee.com"),
+  socialLinks: jsonb("social_links").default([
+    { label: "LinkedIn", url: "https://linkedin.com/company/intellee" },
+    { label: "Twitter", url: "https://twitter.com/intellee" },
+    { label: "Instagram", url: "https://instagram.com/intellee" },
+  ]),
+  footerText: text("footer_text").default("You are receiving this because you expressed interest in Intellee programs."),
+  brandGuidelines: text("brand_guidelines"),
+  createdBy: varchar("created_by", { length: 200 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Email Templates ────────────────────────────────────────
+
+export const emailTemplateCategoryEnum = pgEnum("email_template_category", [
+  "announcement",
+  "course_highlight",
+  "monthly_digest",
+  "event_invitation",
+  "general",
+]);
+
+export const emailTemplates = pgTable("email_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 250 }).notNull(),
+  description: text("description"),
+  category: emailTemplateCategoryEnum("category").default("general").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  templateData: jsonb("template_data").notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: varchar("created_by", { length: 200 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── A/B Test Variants ──────────────────────────────────────
+
+export const abVariants = pgTable("ab_variants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .references(() => campaigns.id)
+    .notNull(),
+  variantLabel: varchar("variant_label", { length: 10 }).notNull(),
+  subjectLine: varchar("subject_line", { length: 500 }),
+  content: jsonb("content"),
+  percentage: integer("percentage").default(50).notNull(),
+  sentCount: integer("sent_count").default(0),
+  openCount: integer("open_count").default(0),
+  clickCount: integer("click_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const abVariantsRelations = relations(abVariants, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [abVariants.campaignId],
+    references: [campaigns.id],
+  }),
+}));
+
 // ─── Type exports ───────────────────────────────────────────
 
 export type Contact = typeof contacts.$inferSelect;
@@ -339,3 +414,6 @@ export type CampaignApproval = typeof campaignApprovals.$inferSelect;
 export type Schedule = typeof schedules.$inferSelect;
 export type SendJob = typeof sendJobs.$inferSelect;
 export type SendRecipient = typeof sendRecipients.$inferSelect;
+export type BrandSettings = typeof brandSettings.$inferSelect;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type AbVariant = typeof abVariants.$inferSelect;

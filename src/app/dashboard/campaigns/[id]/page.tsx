@@ -11,8 +11,11 @@ import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
 import { CampaignActions } from "@/components/dashboard/campaign-actions";
+import { Pencil } from "lucide-react";
 
 export default async function CampaignDetailPage({
   params,
@@ -96,10 +99,20 @@ export default async function CampaignDetailPage({
             </span>
           </div>
         </div>
-        <CampaignActions
-          campaignId={campaign.id}
-          status={campaign.status}
-        />
+        <div className="flex items-center gap-2">
+          {["draft", "changes_requested"].includes(campaign.status) && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/campaigns/${campaign.id}/edit`} className="gap-1.5">
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            </Button>
+          )}
+          <CampaignActions
+            campaignId={campaign.id}
+            status={campaign.status}
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

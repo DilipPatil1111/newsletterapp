@@ -1,9 +1,12 @@
 import { db } from "@/lib/db";
 import { segments, contacts } from "@/server/db/schema";
-import { eq, and, ilike, count, SQL } from "drizzle-orm";
+import { eq, and, ilike, SQL } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { SegmentDetailActions } from "@/components/dashboard/segment-detail-actions";
 import {
   Table,
   TableBody,
@@ -62,11 +65,14 @@ export default async function SegmentDetailPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{segment.name}</h1>
-        {segment.description && (
-          <p className="text-muted-foreground">{segment.description}</p>
-        )}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">{segment.name}</h1>
+          {segment.description && (
+            <p className="text-muted-foreground">{segment.description}</p>
+          )}
+        </div>
+        <SegmentDetailActions segmentId={segment.id} />
       </div>
 
       <Card>

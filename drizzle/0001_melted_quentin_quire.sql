@@ -1,0 +1,2 @@
+ALTER TABLE "brand_settings" ADD COLUMN "business_slug" varchar(100) DEFAULT 'intellee_college';--> statement-breakpoint
+ALTER TABLE "brand_settings" ADD COLUMN "brand_library_urls" jsonb DEFAULT '[]'::jsonb;

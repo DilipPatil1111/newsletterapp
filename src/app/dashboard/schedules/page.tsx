@@ -3,20 +3,9 @@ import { schedules, campaigns } from "@/server/db/schema";
 import { eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Calendar } from "lucide-react";
-import { format } from "date-fns";
-
-const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+import { SchedulesTable } from "@/components/dashboard/schedules-table";
 
 export default async function SchedulesPage() {
   let scheduleList: {
@@ -83,58 +72,18 @@ export default async function SchedulesPage() {
               </Link>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Frequency</TableHead>
-                  <TableHead>Days</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Next Run</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scheduleList.map((schedule) => {
-                  const days = (schedule.daysOfWeek as number[]) || [];
-                  return (
-                    <TableRow key={schedule.id}>
-                      <TableCell className="font-medium">
-                        {schedule.campaignName}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {schedule.frequency}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {days.map((d) => dayNames[d]).join(", ") || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {schedule.timeOfDay} {schedule.timezone}
-                      </TableCell>
-                      <TableCell>
-                        {schedule.nextRunAt
-                          ? format(
-                              new Date(schedule.nextRunAt),
-                              "MMM d, yyyy HH:mm"
-                            )
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            schedule.isActive ? "default" : "secondary"
-                          }
-                        >
-                          {schedule.isActive ? "Active" : "Paused"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <SchedulesTable
+              schedules={scheduleList.map((s) => ({
+                id: s.id,
+                campaignName: s.campaignName,
+                frequency: s.frequency,
+                daysOfWeek: (s.daysOfWeek as number[]) || [],
+                timeOfDay: s.timeOfDay,
+                timezone: s.timezone,
+                nextRunAt: s.nextRunAt,
+                isActive: s.isActive,
+              }))}
+            />
           )}
         </CardContent>
       </Card>
