@@ -14,7 +14,17 @@ interface FooterProps {
   contactEmail?: string;
   socialLinks?: SocialLink[];
   unsubscribeUrl: string;
-  primaryColor?: string;
+  /** Links, email, unsubscribe accent */
+  linkColor?: string;
+  /** Main legal line under social links */
+  footerText?: string;
+  textMutedColor?: string;
+  /** Company name in main footer row */
+  headingColor?: string;
+  /** Outer newsletter background (legal strip) */
+  pageBackground?: string;
+  /** Content card background (optional, for hr contrast) */
+  cardBackground?: string;
 }
 
 export function Footer({
@@ -29,30 +39,50 @@ export function Footer({
     { label: "Instagram", url: "https://instagram.com/intellee" },
   ],
   unsubscribeUrl,
-  primaryColor = "#4338CA",
+  linkColor = "#4338CA",
+  footerText = "You are receiving this because you expressed interest in our programs.",
+  textMutedColor = "#6B7280",
+  headingColor = "#1E1B4B",
+  pageBackground = "#F3F4F6",
+  cardBackground = "#ffffff",
 }: FooterProps) {
+  const hrColor = mixHex(cardBackground, textMutedColor, 0.35);
+
   return (
     <>
-      <Hr style={{ borderColor: "#E5E7EB", margin: 0 }} />
-      <Section style={{ padding: "24px 40px", fontFamily: "Arial, Helvetica, sans-serif" }}>
+      <Hr style={{ borderColor: hrColor, margin: 0 }} />
+      <Section
+        style={{
+          padding: "24px 40px",
+          fontFamily: "Arial, Helvetica, sans-serif",
+          backgroundColor: cardBackground,
+        }}
+      >
         <table role="presentation" width="100%" cellPadding="0" cellSpacing="0">
           <tbody>
             <tr>
               <td style={{ verticalAlign: "top" }}>
-                <Text style={{ margin: "0 0 4px", fontSize: "13px", fontWeight: 600, color: "#1E1B4B" }}>
+                <Text
+                  style={{
+                    margin: "0 0 4px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: headingColor,
+                  }}
+                >
                   {companyName}
                 </Text>
-                <Text style={{ margin: "0 0 2px", fontSize: "12px", color: "#6B7280" }}>{address}</Text>
-                <Text style={{ margin: "0", fontSize: "12px", color: "#6B7280" }}>{phone}</Text>
+                <Text style={{ margin: "0 0 2px", fontSize: "12px", color: textMutedColor }}>{address}</Text>
+                <Text style={{ margin: "0", fontSize: "12px", color: textMutedColor }}>{phone}</Text>
               </td>
               <td style={{ verticalAlign: "top", textAlign: "right" as const }}>
                 <Text style={{ margin: "0 0 2px", fontSize: "12px" }}>
-                  <Link href={websiteUrl} style={{ color: primaryColor, textDecoration: "none" }}>
+                  <Link href={websiteUrl} style={{ color: linkColor, textDecoration: "none" }}>
                     {websiteUrl.replace(/^https?:\/\//, "")}
                   </Link>
                 </Text>
                 <Text style={{ margin: "0 0 2px", fontSize: "12px" }}>
-                  <Link href={`mailto:${contactEmail}`} style={{ color: primaryColor, textDecoration: "none" }}>
+                  <Link href={`mailto:${contactEmail}`} style={{ color: linkColor, textDecoration: "none" }}>
                     {contactEmail}
                   </Link>
                 </Text>
@@ -60,7 +90,7 @@ export function Footer({
                   {socialLinks.map((link, i) => (
                     <React.Fragment key={link.label}>
                       {i > 0 && " \u00B7 "}
-                      <Link href={link.url} style={{ color: "#6B7280", textDecoration: "none" }}>
+                      <Link href={link.url} style={{ color: textMutedColor, textDecoration: "none" }}>
                         {link.label}
                       </Link>
                     </React.Fragment>
@@ -73,16 +103,23 @@ export function Footer({
       </Section>
       <Section
         style={{
-          backgroundColor: "#F9FAFB",
+          backgroundColor: pageBackground,
           padding: "16px 40px",
           textAlign: "center" as const,
           fontFamily: "Arial, Helvetica, sans-serif",
         }}
       >
-        <Text style={{ margin: "0", color: "#9CA3AF", fontSize: "11px", lineHeight: "1.6" }}>
-          You are receiving this because you expressed interest in Intellee programs.
+        <Text
+          style={{
+            margin: "0",
+            color: textMutedColor,
+            fontSize: "11px",
+            lineHeight: "1.6",
+          }}
+        >
+          {footerText}
           <br />
-          <Link href={unsubscribeUrl} style={{ color: primaryColor, textDecoration: "underline" }}>
+          <Link href={unsubscribeUrl} style={{ color: linkColor, textDecoration: "underline" }}>
             Unsubscribe
           </Link>
           {" \u00B7 \u00A9 "}
@@ -91,4 +128,22 @@ export function Footer({
       </Section>
     </>
   );
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = /^#?([0-9a-f]{6})$/i.exec(a.trim());
+  const pb = /^#?([0-9a-f]{6})$/i.exec(b.trim());
+  if (!pa || !pb) return "#E5E7EB";
+  const av = parseInt(pa[1], 16);
+  const bv = parseInt(pb[1], 16);
+  const ar = (av >> 16) & 255;
+  const ag = (av >> 8) & 255;
+  const ab = av & 255;
+  const br = (bv >> 16) & 255;
+  const bg = (bv >> 8) & 255;
+  const bb = bv & 255;
+  const m = (x: number, y: number) => Math.round(x + (y - x) * t);
+  return `#${[m(ar, br), m(ag, bg), m(ab, bb)]
+    .map((n) => n.toString(16).padStart(2, "0"))
+    .join("")}`;
 }

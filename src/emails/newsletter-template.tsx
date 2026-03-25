@@ -1,18 +1,9 @@
-import {
-  Html,
-  Head,
-  Body,
-  Container,
-  Section,
-  Text,
-  Preview,
-} from "@react-email/components";
+import { Html, Head, Body, Section, Text, Preview } from "@react-email/components";
 import * as React from "react";
 import { Header } from "./components/header";
 import { StatsBar, type Stat } from "./components/stats-bar";
 import { SectionBlock, type SectionStyle } from "./components/section-block";
 import { CtaButton } from "./components/cta-button";
-import { EmailSignature } from "./components/email-signature";
 import { Footer } from "./components/footer";
 
 export interface ContentBlock {
@@ -26,6 +17,23 @@ export interface ContentBlock {
   url?: string;
 }
 
+export interface NewsletterBrandProps {
+  companyName?: string;
+  headerBackgroundColor?: string;
+  newsletterPageBackground?: string;
+  newsletterCardBackground?: string;
+  newsletterTextColor?: string;
+  newsletterLinkColor?: string;
+  fontFamily?: string;
+  logoUrl?: string;
+  address?: string;
+  phone?: string;
+  websiteUrl?: string;
+  contactEmail?: string;
+  socialLinks?: { label: string; url: string }[];
+  footerText?: string;
+}
+
 export interface NewsletterTemplateProps {
   subject: string;
   previewText?: string;
@@ -35,18 +43,7 @@ export interface NewsletterTemplateProps {
   showStats?: boolean;
   stats?: Stat[];
   appUrl?: string;
-  brand?: {
-    companyName?: string;
-    primaryColor?: string;
-    accentColor?: string;
-    logoUrl?: string;
-    address?: string;
-    phone?: string;
-    websiteUrl?: string;
-    contactEmail?: string;
-    socialLinks?: { label: string; url: string }[];
-    footerText?: string;
-  };
+  brand?: NewsletterBrandProps;
 }
 
 export function NewsletterTemplate({
@@ -64,65 +61,149 @@ export function NewsletterTemplate({
     ? `${appUrl}/unsubscribe?email=${encodeURIComponent(recipientEmail)}`
     : `${appUrl}/unsubscribe`;
 
+  const pageBg = brand.newsletterPageBackground ?? "#F3F4F6";
+  const cardBg = brand.newsletterCardBackground ?? "#ffffff";
+  const textColor = brand.newsletterTextColor ?? "#374151";
+  const linkColor = brand.newsletterLinkColor ?? "#4338CA";
+  const headerBg = brand.headerBackgroundColor ?? "#1E1B4B";
+  const font = brand.fontFamily ?? "Georgia, 'Times New Roman', Times, serif";
+
   return (
     <Html lang="en">
       <Head />
       {previewText && <Preview>{previewText}</Preview>}
-      <Body style={bodyStyle}>
-        <Container style={wrapperStyle}>
-          <Container style={containerStyle}>
-            <Header
-              companyName={brand.companyName}
-              subject={subject}
-              primaryColor={brand.primaryColor}
-              logoUrl={brand.logoUrl}
-            />
+      {/*
+        Table-based outer shell: many clients (Gmail, Outlook) ignore background on <body>
+        or nested divs; bgcolor + full-width table is the reliable pattern.
+      */}
+      <Body style={{ ...bodyStyle, backgroundColor: pageBg, fontFamily: font }}>
+        <table
+          role="presentation"
+          width="100%"
+          cellPadding={0}
+          cellSpacing={0}
+          border={0}
+          style={{ backgroundColor: pageBg, margin: 0, borderCollapse: "collapse" }}
+          bgcolor={pageBg}
+        >
+          <tbody>
+            <tr>
+              <td align="center" style={{ backgroundColor: pageBg, padding: "32px 16px" }}>
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellPadding={0}
+                  cellSpacing={0}
+                  border={0}
+                  style={{
+                    maxWidth: "580px",
+                    margin: "0 auto",
+                    backgroundColor: cardBg,
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                    borderCollapse: "collapse",
+                  }}
+                  bgcolor={cardBg}
+                >
+                  <tbody>
+                    <tr>
+                      <td style={{ backgroundColor: cardBg }}>
+                        <Header
+                          companyName={brand.companyName}
+                          subject={subject}
+                          headerBackgroundColor={headerBg}
+                          logoUrl={brand.logoUrl}
+                        />
 
-            {showStats && <StatsBar stats={stats} />}
+                        {showStats && (
+                          <StatsBar
+                            stats={stats}
+                            borderColor={blendWithWhite(textColor, 0.9)}
+                            backgroundColor={cardBg}
+                            valueColor={linkColor}
+                            labelColor={blendWithWhite(textColor, 0.55)}
+                          />
+                        )}
 
-            <Section style={{ padding: "28px 40px" }}>
-              {recipientName && (
-                <Text style={greetingStyle}>Hi {recipientName},</Text>
-              )}
+                        <Section style={{ padding: "28px 40px", backgroundColor: cardBg }}>
+                          {recipientName && (
+                            <Text style={{ ...greetingStyle, color: textColor }}>
+                              Hi {recipientName},
+                            </Text>
+                          )}
 
-              {blocks.map((block, i) => renderBlock(block, i, brand.accentColor))}
-            </Section>
+                          {blocks.map((block, i) =>
+                            renderBlock(block, i, {
+                              linkColor,
+                              textColor,
+                              cardBackground: cardBg,
+                            })
+                          )}
+                        </Section>
 
-            <EmailSignature
-              companyName={brand.companyName}
-              address={brand.address}
-              phone={brand.phone}
-              websiteUrl={brand.websiteUrl}
-              primaryColor={brand.accentColor || brand.primaryColor}
-            />
-
-            <Footer
-              companyName={brand.companyName}
-              address={brand.address}
-              websiteUrl={brand.websiteUrl}
-              contactEmail={brand.contactEmail}
-              socialLinks={brand.socialLinks}
-              unsubscribeUrl={unsubscribeUrl}
-              primaryColor={brand.accentColor || brand.primaryColor}
-            />
-          </Container>
-        </Container>
+                        <Footer
+                          companyName={brand.companyName}
+                          address={brand.address}
+                          phone={brand.phone}
+                          websiteUrl={brand.websiteUrl}
+                          contactEmail={brand.contactEmail}
+                          socialLinks={brand.socialLinks}
+                          unsubscribeUrl={unsubscribeUrl}
+                          linkColor={linkColor}
+                          footerText={brand.footerText}
+                          textMutedColor={blendWithWhite(textColor, 0.55)}
+                          headingColor={textColor}
+                          pageBackground={pageBg}
+                          cardBackground={cardBg}
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </Body>
     </Html>
   );
 }
 
-function renderBlock(block: ContentBlock, index: number, accentColor?: string) {
+/** Mute a hex color toward light gray for secondary text (simple mix for email clients). */
+function blendWithWhite(hex: string, whiteAmount: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "#6B7280";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const t = Math.min(1, Math.max(0, whiteAmount));
+  const R = Math.round(r + (255 - r) * t);
+  const G = Math.round(g + (255 - g) * t);
+  const B = Math.round(b + (255 - b) * t);
+  return `#${[R, G, B].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function renderBlock(
+  block: ContentBlock,
+  index: number,
+  colors: {
+    linkColor: string;
+    textColor: string;
+    cardBackground: string;
+  }
+) {
+  const { linkColor, textColor, cardBackground } = colors;
   switch (block.type) {
     case "heading":
       return (
-        <Text key={index} style={headingStyle}>
+        <Text key={index} style={{ ...headingStyle, color: textColor }}>
           {block.text}
         </Text>
       );
     case "paragraph":
       return (
-        <Text key={index} style={paragraphStyle}>
+        <Text key={index} style={{ ...paragraphStyle, color: textColor }}>
           {block.text}
         </Text>
       );
@@ -133,6 +214,9 @@ function renderBlock(block: ContentBlock, index: number, accentColor?: string) {
           title={block.title || ""}
           body={block.body || ""}
           sectionStyle={block.style || "default"}
+          bodyTextColor={textColor}
+          linkColor={linkColor}
+          cardBackground={cardBackground}
         />
       );
     case "cta":
@@ -141,7 +225,10 @@ function renderBlock(block: ContentBlock, index: number, accentColor?: string) {
           key={index}
           text={block.text || "Learn More"}
           url={block.url || "#"}
-          accentColor={accentColor}
+          accentColor={linkColor}
+          preText="Ready to take the next step in your career?"
+          cardBackground={cardBackground}
+          textColor={textColor}
         />
       );
     case "divider":
@@ -150,7 +237,7 @@ function renderBlock(block: ContentBlock, index: number, accentColor?: string) {
           key={index}
           style={{
             border: "none",
-            borderTop: "1px solid #E5E7EB",
+            borderTop: `1px solid ${blendWithWhite(textColor, 0.82)}`,
             margin: "24px 0",
           }}
         />
@@ -176,27 +263,12 @@ function renderBlock(block: ContentBlock, index: number, accentColor?: string) {
 const bodyStyle: React.CSSProperties = {
   margin: 0,
   padding: 0,
-  backgroundColor: "#F3F4F6",
-  fontFamily: "Georgia, 'Times New Roman', Times, serif",
   WebkitFontSmoothing: "antialiased",
-};
-
-const wrapperStyle: React.CSSProperties = {
-  padding: "32px 16px",
-};
-
-const containerStyle: React.CSSProperties = {
-  maxWidth: "580px",
-  margin: "0 auto",
-  backgroundColor: "#ffffff",
-  borderRadius: "8px",
-  overflow: "hidden",
 };
 
 const greetingStyle: React.CSSProperties = {
   margin: "0 0 16px",
   fontSize: "16px",
-  color: "#374151",
   lineHeight: "1.6",
 };
 
@@ -204,13 +276,11 @@ const headingStyle: React.CSSProperties = {
   margin: "16px 0 8px",
   fontSize: "20px",
   fontWeight: 600,
-  color: "#111827",
   lineHeight: "1.4",
 };
 
 const paragraphStyle: React.CSSProperties = {
   margin: "6px 0",
-  color: "#374151",
   fontSize: "15px",
   lineHeight: "1.75",
 };

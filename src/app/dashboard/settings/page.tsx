@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { CheckCircle, Loader2, Palette, Save, Plus, Trash2, Library } from "lucide-react";
-import { DEFAULT_BUSINESSES } from "@/lib/businesses";
+import type { BusinessConfig } from "@/lib/businesses";
+import { BusinessManager } from "@/components/dashboard/business-manager";
 
 interface SocialLink {
   label: string;
@@ -20,11 +21,13 @@ interface SocialLink {
 
 interface BrandSettingsState {
   businessSlug: string;
-  companyName: string;
   logoUrl: string;
   brandLibraryUrls: string[];
-  primaryColor: string;
-  accentColor: string;
+  headerBackgroundColor: string;
+  newsletterPageBackground: string;
+  newsletterCardBackground: string;
+  newsletterTextColor: string;
+  newsletterLinkColor: string;
   fontFamily: string;
   address: string;
   phone: string;
@@ -37,11 +40,13 @@ interface BrandSettingsState {
 
 const defaultBrand: BrandSettingsState = {
   businessSlug: "intellee_college",
-  companyName: "Intellee College",
   logoUrl: "",
   brandLibraryUrls: [],
-  primaryColor: "#1E1B4B",
-  accentColor: "#4338CA",
+  headerBackgroundColor: "#1E1B4B",
+  newsletterPageBackground: "#F3F4F6",
+  newsletterCardBackground: "#ffffff",
+  newsletterTextColor: "#374151",
+  newsletterLinkColor: "#4338CA",
   fontFamily: "Georgia, 'Times New Roman', Times, serif",
   address: "Tech Park, Bangalore, India",
   phone: "+91 98765 43210",
@@ -58,6 +63,7 @@ const defaultBrand: BrandSettingsState = {
 
 export default function SettingsPage() {
   const [brand, setBrand] = useState<BrandSettingsState>(defaultBrand);
+  const [businessesList, setBusinessesList] = useState<BusinessConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -67,24 +73,36 @@ export default function SettingsPage() {
 
   async function fetchBrandSettings() {
     try {
-      const res = await fetch("/api/settings/brand");
+      const [res, bizRes] = await Promise.all([
+        fetch("/api/settings/brand"),
+        fetch("/api/businesses"),
+      ]);
+      const bizData = await bizRes.json().catch(() => ({}));
+      setBusinessesList(bizData.businesses || []);
       const data = await res.json();
       if (data.settings) {
+        const s = data.settings;
         setBrand({
-          businessSlug: data.settings.businessSlug || defaultBrand.businessSlug,
-          companyName: data.settings.companyName || defaultBrand.companyName,
-          logoUrl: data.settings.logoUrl || "",
-          brandLibraryUrls: Array.isArray(data.settings.brandLibraryUrls) ? data.settings.brandLibraryUrls : [],
-          primaryColor: data.settings.primaryColor || defaultBrand.primaryColor,
-          accentColor: data.settings.accentColor || defaultBrand.accentColor,
-          fontFamily: data.settings.fontFamily || defaultBrand.fontFamily,
-          address: data.settings.address || defaultBrand.address,
-          phone: data.settings.phone || defaultBrand.phone,
-          websiteUrl: data.settings.websiteUrl || defaultBrand.websiteUrl,
-          contactEmail: data.settings.contactEmail || defaultBrand.contactEmail,
-          socialLinks: data.settings.socialLinks || defaultBrand.socialLinks,
-          footerText: data.settings.footerText || defaultBrand.footerText,
-          brandGuidelines: data.settings.brandGuidelines || "",
+          businessSlug: s.businessSlug || defaultBrand.businessSlug,
+          logoUrl: s.logoUrl || "",
+          brandLibraryUrls: Array.isArray(s.brandLibraryUrls) ? s.brandLibraryUrls : [],
+          headerBackgroundColor:
+            s.headerBackgroundColor || s.primaryColor || defaultBrand.headerBackgroundColor,
+          newsletterPageBackground:
+            s.newsletterPageBackground || defaultBrand.newsletterPageBackground,
+          newsletterCardBackground:
+            s.newsletterCardBackground || defaultBrand.newsletterCardBackground,
+          newsletterTextColor: s.newsletterTextColor || defaultBrand.newsletterTextColor,
+          newsletterLinkColor:
+            s.newsletterLinkColor || s.accentColor || defaultBrand.newsletterLinkColor,
+          fontFamily: s.fontFamily || defaultBrand.fontFamily,
+          address: s.address || defaultBrand.address,
+          phone: s.phone || defaultBrand.phone,
+          websiteUrl: s.websiteUrl || defaultBrand.websiteUrl,
+          contactEmail: s.contactEmail || defaultBrand.contactEmail,
+          socialLinks: s.socialLinks || defaultBrand.socialLinks,
+          footerText: s.footerText || defaultBrand.footerText,
+          brandGuidelines: s.brandGuidelines || "",
         });
       }
     } catch {
@@ -156,12 +174,11 @@ export default function SettingsPage() {
   }
 
   function onBusinessChange(slug: string) {
-    const b = DEFAULT_BUSINESSES.find((x) => x.slug === slug);
+    const b = businessesList.find((x) => x.slug === slug);
     if (b) {
       setBrand((prev) => ({
         ...prev,
         businessSlug: slug,
-        companyName: b.name,
         address: b.defaultAddress || prev.address,
         phone: b.defaultPhone || prev.phone,
         websiteUrl: b.defaultWebsiteUrl || prev.websiteUrl,
@@ -169,6 +186,8 @@ export default function SettingsPage() {
       }));
     }
   }
+
+  const selectedBusiness = businessesList.find((x) => x.slug === brand.businessSlug);
 
   if (loading) {
     return (
@@ -196,54 +215,66 @@ export default function SettingsPage() {
         <TabsContent value="brand" className="space-y-6 mt-4">
           <Card>
             <CardHeader>
+              <CardTitle>Businesses</CardTitle>
+              <CardDescription>
+                Add, edit, or remove businesses. The business <strong>name</strong> is the organization
+                name shown in emails (one field — no duplicate &quot;company name&quot;).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BusinessManager
+                onChanged={() => {
+                  fetch("/api/businesses")
+                    .then((r) => r.json())
+                    .then((d) => setBusinessesList(d.businesses || []));
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                Brand Identity
+                Brand identity
               </CardTitle>
               <CardDescription>
-                These settings are applied to all emails sent from the platform.
+                Active business for this workspace, logo, and newsletter appearance.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="business">Business</Label>
+                <Label htmlFor="business">Active business</Label>
                 <Select value={brand.businessSlug} onValueChange={onBusinessChange}>
                   <SelectTrigger id="business">
                     <SelectValue placeholder="Select business" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEFAULT_BUSINESSES.map((b) => (
+                    {(businessesList.length ? businessesList : []).map((b) => (
                       <SelectItem key={b.slug} value={b.slug}>
                         {b.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Used for email signature and newsletter creation labels.
+                <p className="text-sm text-muted-foreground">
+                  Organization name in emails:{" "}
+                  <span className="font-medium text-foreground">
+                    {selectedBusiness?.name ?? "—"}
+                  </span>
                 </p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Company Name</Label>
-                  <Input
-                    id="companyName"
-                    value={brand.companyName}
-                    onChange={(e) => setBrand({ ...brand, companyName: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="logoUrl">Logo URL</Label>
-                  <Input
-                    id="logoUrl"
-                    placeholder="https://example.com/logo.png"
-                    value={brand.logoUrl}
-                    onChange={(e) => setBrand({ ...brand, logoUrl: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Logo appears in the email header. Use a direct image URL.
-                  </p>
-                </div>
+              <div className="space-y-2 max-w-xl">
+                <Label htmlFor="logoUrl">Logo URL</Label>
+                <Input
+                  id="logoUrl"
+                  placeholder="https://example.com/logo.png"
+                  value={brand.logoUrl}
+                  onChange={(e) => setBrand({ ...brand, logoUrl: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown in the email header. Use a direct image URL.
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -274,46 +305,48 @@ export default function SettingsPage() {
                 ))}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="primaryColor">Primary Color</Label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={brand.primaryColor}
-                      onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })}
-                      className="h-10 w-10 cursor-pointer rounded border"
-                    />
-                    <Input
-                      id="primaryColor"
-                      value={brand.primaryColor}
-                      onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="accentColor">Accent Color</Label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={brand.accentColor}
-                      onChange={(e) => setBrand({ ...brand, accentColor: e.target.value })}
-                      className="h-10 w-10 cursor-pointer rounded border"
-                    />
-                    <Input
-                      id="accentColor"
-                      value={brand.accentColor}
-                      onChange={(e) => setBrand({ ...brand, accentColor: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fontFamily">Font Family</Label>
-                  <Input
-                    id="fontFamily"
-                    value={brand.fontFamily}
-                    onChange={(e) => setBrand({ ...brand, fontFamily: e.target.value })}
+              <div className="space-y-2">
+                <Label>Newsletter appearance</Label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Controls HTML newsletter layout: outer background, content area, text color, link/button
+                  color, and header strip. Legacy &quot;primary&quot; color is replaced by these explicit
+                  roles.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <ColorField
+                    label="Header background"
+                    value={brand.headerBackgroundColor}
+                    onChange={(v) => setBrand({ ...brand, headerBackgroundColor: v })}
                   />
+                  <ColorField
+                    label="Page background (outer)"
+                    value={brand.newsletterPageBackground}
+                    onChange={(v) => setBrand({ ...brand, newsletterPageBackground: v })}
+                  />
+                  <ColorField
+                    label="Content background (card)"
+                    value={brand.newsletterCardBackground}
+                    onChange={(v) => setBrand({ ...brand, newsletterCardBackground: v })}
+                  />
+                  <ColorField
+                    label="Text color (foreground)"
+                    value={brand.newsletterTextColor}
+                    onChange={(v) => setBrand({ ...brand, newsletterTextColor: v })}
+                  />
+                  <ColorField
+                    label="Links & buttons"
+                    value={brand.newsletterLinkColor}
+                    onChange={(v) => setBrand({ ...brand, newsletterLinkColor: v })}
+                  />
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="fontFamily">Font family (newsletter body)</Label>
+                    <Input
+                      id="fontFamily"
+                      value={brand.fontFamily}
+                      onChange={(e) => setBrand({ ...brand, fontFamily: e.target.value })}
+                      placeholder="Georgia, Arial, sans-serif"
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -434,6 +467,31 @@ export default function SettingsPage() {
           <CronCard />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">{label}</Label>
+      <div className="flex gap-2">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 w-10 shrink-0 cursor-pointer rounded border"
+        />
+        <Input value={value} onChange={(e) => onChange(e.target.value)} className="font-mono text-xs" />
+      </div>
     </div>
   );
 }

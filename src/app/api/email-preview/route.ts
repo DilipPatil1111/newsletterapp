@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { brandSettings } from "@/server/db/schema";
 import { renderEmail, parseContentToBlocks, type ContentBlock } from "@/lib/email-renderer";
+import { mapBrandForEmail } from "@/lib/brand-email";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -36,19 +37,7 @@ export async function POST(req: Request) {
     }
 
     const [brand] = await db.select().from(brandSettings).limit(1);
-    const brandOpts = brand
-      ? {
-          companyName: brand.companyName,
-          primaryColor: brand.primaryColor,
-          accentColor: brand.accentColor,
-          logoUrl: brand.logoUrl ?? undefined,
-          address: brand.address ?? undefined,
-          phone: brand.phone ?? undefined,
-          websiteUrl: brand.websiteUrl ?? undefined,
-          contactEmail: brand.contactEmail ?? undefined,
-          socialLinks: (brand.socialLinks as { label: string; url: string }[] | null) ?? undefined,
-        }
-      : undefined;
+    const brandOpts = mapBrandForEmail(brand ?? undefined);
 
     const html = await renderEmail({
       subject,

@@ -4,18 +4,19 @@ import * as React from "react";
 interface HeaderProps {
   companyName?: string;
   subject: string;
-  primaryColor?: string;
+  /** Background of the top brand strip */
+  headerBackgroundColor?: string;
   logoUrl?: string;
 }
 
 export function Header({
   companyName = "Intellee College",
   subject,
-  primaryColor = "#1E1B4B",
+  headerBackgroundColor = "#1E1B4B",
   logoUrl,
 }: HeaderProps) {
   return (
-    <Section style={{ ...headerStyle, backgroundColor: primaryColor }}>
+    <Section style={{ ...headerStyle, backgroundColor: headerBackgroundColor }}>
       {logoUrl ? (
         <Img
           src={logoUrl}

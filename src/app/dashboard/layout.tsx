@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { IntuAssistant } from "@/components/dashboard/intu-assistant";
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,7 @@ export default function DashboardLayout({
       <SidebarInset>
         <DashboardHeader />
         <div className="flex-1 p-6">{children}</div>
+        <IntuAssistant />
       </SidebarInset>
     </SidebarProvider>
   );

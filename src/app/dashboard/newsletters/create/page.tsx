@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { DEFAULT_BUSINESSES } from "@/lib/businesses";
+import { DEFAULT_BUSINESSES, type BusinessConfig } from "@/lib/businesses";
 import { starterTemplates } from "@/lib/starter-templates";
 import { blocksToRawContent, replacePlaceholdersInBlocks } from "@/lib/email-renderer";
 import { EmailPreview } from "@/components/dashboard/email-preview";
@@ -77,6 +77,7 @@ export default function CreateNewsletterPage() {
   const [showAiChat, setShowAiChat] = useState(false);
 
   const [businessSlug, setBusinessSlug] = useState("intellee_college");
+  const [businessesList, setBusinessesList] = useState<BusinessConfig[]>([]);
   const [topicName, setTopicName] = useState("");
   const [contextName, setContextName] = useState("Intellee College");
   const [useTemplate, setUseTemplate] = useState(false);
@@ -92,6 +93,13 @@ export default function CreateNewsletterPage() {
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [loadingContacts, setLoadingContacts] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/businesses")
+      .then((r) => r.json())
+      .then((d) => setBusinessesList(d.businesses || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (step === 3) {
@@ -114,7 +122,10 @@ export default function CreateNewsletterPage() {
     }
   }
 
-  const business = DEFAULT_BUSINESSES.find((b) => b.slug === businessSlug) ?? DEFAULT_BUSINESSES[0];
+  const business =
+    businessesList.find((b) => b.slug === businessSlug) ??
+    businessesList[0] ??
+    DEFAULT_BUSINESSES[0];
 
   useEffect(() => {
     setContextName(business.name);
@@ -240,11 +251,27 @@ export default function CreateNewsletterPage() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to send");
+        const err = await res.json().catch(() => ({}));
+        const msg =
+          typeof err.error === "string"
+            ? err.error
+            : "Failed to send newsletter";
+        throw new Error(msg);
       }
       const data = await res.json();
-      toast.success(`Newsletter sent to ${data.sent} recipients!`);
+      const sent = typeof data.sent === "number" ? data.sent : 0;
+      const failed = typeof data.failed === "number" ? data.failed : 0;
+      if (sent === 0 && failed > 0) {
+        toast.error(
+          `No emails were delivered (${failed} failed). Check Resend domain, RESEND_FROM_EMAIL, and server logs.`
+        );
+        return;
+      }
+      if (sent > 0 && failed > 0) {
+        toast.warning(`Sent to ${sent} recipient(s); ${failed} failed.`);
+      } else {
+        toast.success(`Newsletter sent to ${sent} recipient(s)!`);
+      }
       router.push("/dashboard/campaigns");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send newsletter");
@@ -311,7 +338,7 @@ export default function CreateNewsletterPage() {
                   <SelectValue placeholder="Select business" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DEFAULT_BUSINESSES.map((b) => (
+                  {(businessesList.length ? businessesList : DEFAULT_BUSINESSES).map((b) => (
                     <SelectItem key={b.slug} value={b.slug}>
                       {b.name}
                     </SelectItem>

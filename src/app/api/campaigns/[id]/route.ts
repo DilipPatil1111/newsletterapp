@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { deleteCampaignCascade } from "@/lib/delete-campaign";
 import { campaigns, campaignVersions } from "@/server/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
@@ -131,26 +132,13 @@ export async function DELETE(
 
   const { id } = await params;
   try {
-    const [existing] = await db
-      .select()
-      .from(campaigns)
-      .where(eq(campaigns.id, id))
-      .limit(1);
-
-    if (!existing) {
+    const deleted = await deleteCampaignCascade(id);
+    if (!deleted) {
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
-
-    if (!["draft", "cancelled", "changes_requested"].includes(existing.status)) {
-      return NextResponse.json(
-        { error: "Only draft, cancelled, or changes_requested campaigns can be deleted" },
-        { status: 400 }
-      );
-    }
-
-    await db.delete(campaigns).where(eq(campaigns.id, id));
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("Campaign delete error:", err);
     return NextResponse.json(
       { error: "Failed to delete campaign" },
       { status: 500 }

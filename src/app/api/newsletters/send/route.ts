@@ -6,6 +6,17 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { renderEmail, renderEmailPlainText, parseContentToBlocks } from "@/lib/email-renderer";
+import { mapBrandForEmail } from "@/lib/brand-email";
+import { clientSafeDbError } from "@/lib/db-errors";
+
+function sanitizeEmailDisplayName(name: string): string {
+  const s = name.replace(/[\r\n<>"]/g, "").trim().slice(0, 78);
+  return s || "Newsletter";
+}
+
+function isValidEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
 
 const sendSchema = z.object({
   courseName: z.string().min(1),
@@ -15,6 +26,8 @@ const sendSchema = z.object({
   ctaText: z.string().optional(),
   ctaUrl: z.string().optional(),
   contactIds: z.array(z.string()).min(1),
+  /** Optional CC (e.g. Intu assistant — copy signed-in user). Resend supports multiple. */
+  ccEmails: z.array(z.string().email()).optional(),
 });
 
 export async function POST(req: Request) {
@@ -39,6 +52,17 @@ export async function POST(req: Request) {
 
     if (selectedContacts.length === 0) {
       return NextResponse.json({ error: "No valid contacts found" }, { status: 400 });
+    }
+
+    const resendKey = process.env.RESEND_API_KEY?.trim();
+    if (!resendKey) {
+      return NextResponse.json(
+        {
+          error:
+            "Email is not configured. Set RESEND_API_KEY (and optionally RESEND_FROM_EMAIL) in your environment.",
+        },
+        { status: 503 }
+      );
     }
 
     const [campaign] = await db
@@ -66,7 +90,6 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    const resendKey = process.env.RESEND_API_KEY;
     const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://intellee.com";
     let sentCount = 0;
@@ -75,114 +98,103 @@ export async function POST(req: Request) {
     const blocks = parseContentToBlocks(data.htmlContent, data.ctaText, data.ctaUrl);
 
     const [brand] = await db.select().from(brandSettings).limit(1);
-    const brandOpts = brand
-      ? {
-          companyName: brand.companyName,
-          primaryColor: brand.primaryColor,
-          accentColor: brand.accentColor,
-          logoUrl: brand.logoUrl ?? undefined,
-          address: brand.address ?? undefined,
-          phone: brand.phone ?? undefined,
-          websiteUrl: brand.websiteUrl ?? undefined,
-          contactEmail: brand.contactEmail ?? undefined,
-          socialLinks: (brand.socialLinks as { label: string; url: string }[] | null) ?? undefined,
+    const brandOpts = mapBrandForEmail(brand ?? undefined);
+
+    const resend = new Resend(resendKey);
+
+    const ccList =
+      data.ccEmails?.filter((e) => isValidEmail(e.trim())).map((e) => e.trim()) ?? [];
+
+    for (const contact of selectedContacts) {
+      const recipientName = contact.firstName || contact.email.split("@")[0];
+
+      const personalizedSubject = `${recipientName}, ${data.subjectLine.charAt(0).toLowerCase()}${data.subjectLine.slice(1)}`;
+
+      const personalizedBlocks = blocks.map((block) => {
+        if (block.text) {
+          return { ...block, text: block.text.replace(/\{\{firstName\}\}/g, recipientName) };
         }
-      : undefined;
+        if (block.body) {
+          return { ...block, body: block.body.replace(/\{\{firstName\}\}/g, recipientName) };
+        }
+        return block;
+      });
 
-    if (resendKey) {
-      const resend = new Resend(resendKey);
+      const renderOpts = {
+        subject: data.subjectLine,
+        previewText: data.previewText,
+        recipientName,
+        recipientEmail: contact.email,
+        blocks: personalizedBlocks,
+        showStats: true,
+        appUrl,
+        brand: brandOpts,
+      };
 
-      for (const contact of selectedContacts) {
-        const recipientName = contact.firstName || contact.email.split("@")[0];
+      const unsubUrl = `${appUrl}/unsubscribe?email=${encodeURIComponent(contact.email)}`;
 
-        const personalizedSubject = `${recipientName}, ${data.subjectLine.charAt(0).toLowerCase()}${data.subjectLine.slice(1)}`;
-
-        const personalizedBlocks = blocks.map((block) => {
-          if (block.text) {
-            return { ...block, text: block.text.replace(/\{\{firstName\}\}/g, recipientName) };
-          }
-          if (block.body) {
-            return { ...block, body: block.body.replace(/\{\{firstName\}\}/g, recipientName) };
-          }
-          return block;
-        });
-
-        const renderOpts = {
-          subject: data.subjectLine,
-          previewText: data.previewText,
-          recipientName,
-          recipientEmail: contact.email,
-          blocks: personalizedBlocks,
-          showStats: true,
-          appUrl,
-          brand: brandOpts,
-        };
-
+      try {
         const htmlBody = await renderEmail(renderOpts);
         const plainText = await renderEmailPlainText(renderOpts);
 
-        const unsubUrl = `${appUrl}/unsubscribe?email=${encodeURIComponent(contact.email)}`;
+        const companyName = sanitizeEmailDisplayName(
+          brandOpts?.companyName || "Intellee College"
+        );
+        const replyCandidate =
+          brandOpts?.contactEmail?.trim() || "admissions@intellee.com";
+        const replyTo = isValidEmail(replyCandidate) ? replyCandidate : undefined;
 
-        try {
-          const companyName = brandOpts?.companyName || "Intellee College";
-          const replyTo = brandOpts?.contactEmail || "admissions@intellee.com";
-          const result = await resend.emails.send({
-            from: `${companyName} <${fromEmail}>`,
-            replyTo,
-            to: contact.email,
-            subject: personalizedSubject,
-            html: htmlBody,
-            text: plainText,
-            headers: {
-              "List-Unsubscribe": `<${unsubUrl}>`,
-              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-              "X-Entity-Ref-ID": `intellee-${campaign.id}-${contact.id}`,
-            },
-          });
+        const ccForThis = ccList.filter(
+          (cc) => cc.toLowerCase() !== contact.email.toLowerCase()
+        );
 
-          if (result.error) {
-            console.error(`Resend error for ${contact.email}:`, result.error);
-            await db.insert(sendRecipients).values({
-              sendJobId: job.id,
-              contactId: contact.id,
-              email: contact.email,
-              status: "failed",
-              errorMessage: result.error.message,
-            });
-            failCount++;
-          } else {
-            await db.insert(sendRecipients).values({
-              sendJobId: job.id,
-              contactId: contact.id,
-              email: contact.email,
-              status: "delivered",
-              providerMessageId: result.data?.id,
-              sentAt: new Date(),
-            });
-            sentCount++;
-          }
-        } catch (err) {
-          console.error(`Exception sending to ${contact.email}:`, err);
+        const result = await resend.emails.send({
+          from: `${companyName} <${fromEmail}>`,
+          ...(replyTo ? { replyTo } : {}),
+          to: contact.email,
+          ...(ccForThis.length > 0 ? { cc: ccForThis } : {}),
+          subject: personalizedSubject,
+          html: htmlBody,
+          text: plainText,
+          headers: {
+            "List-Unsubscribe": `<${unsubUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "X-Entity-Ref-ID": `intellee-${campaign.id}-${contact.id}`,
+          },
+        });
+
+        if (result.error) {
+          console.error(`Resend error for ${contact.email}:`, result.error);
           await db.insert(sendRecipients).values({
             sendJobId: job.id,
             contactId: contact.id,
             email: contact.email,
             status: "failed",
-            errorMessage: err instanceof Error ? err.message : "Unknown error",
+            errorMessage: result.error.message,
           });
           failCount++;
+        } else {
+          await db.insert(sendRecipients).values({
+            sendJobId: job.id,
+            contactId: contact.id,
+            email: contact.email,
+            status: "delivered",
+            providerMessageId: result.data?.id,
+            sentAt: new Date(),
+          });
+          sentCount++;
         }
-      }
-    } else {
-      for (const contact of selectedContacts) {
+      } catch (err) {
+        console.error(`Send/render error for ${contact.email}:`, err);
         await db.insert(sendRecipients).values({
           sendJobId: job.id,
           contactId: contact.id,
           email: contact.email,
-          status: "pending",
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : "Unknown error",
         });
+        failCount++;
       }
-      sentCount = selectedContacts.length;
     }
 
     await db
@@ -211,9 +223,10 @@ export async function POST(req: Request) {
       );
     }
     console.error("Newsletter send error:", error);
-    return NextResponse.json(
-      { error: "Failed to send newsletter" },
-      { status: 500 }
+    const message = clientSafeDbError(
+      error,
+      "Failed to send newsletter. Try again or check server logs."
     );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -4,7 +4,7 @@ import { z } from "zod";
 import Exa from "exa-js";
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { getBusinessBySlug } from "@/lib/businesses";
+import { resolveBusinessBySlug } from "@/lib/businesses-service";
 
 const generateSchema = z.object({
   courseName: z.string().min(1),
@@ -34,7 +34,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { courseName, collegeContext, businessSlug } = generateSchema.parse(body);
     const college = collegeContext || "Intellee College";
-    const business = businessSlug ? getBusinessBySlug(businessSlug) : undefined;
+    const business = businessSlug
+      ? await resolveBusinessBySlug(businessSlug)
+      : undefined;
     const promptContext = business?.generatePromptContext ?? "education, courses, career training, placement";
 
     let trendData: ExaResult[] = [];

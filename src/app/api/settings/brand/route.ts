@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { brandSettings } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { resolveBusinessBySlug } from "@/lib/businesses-service";
 
 export async function GET() {
   const { userId } = await auth();
@@ -31,28 +32,46 @@ export async function PUT(req: Request) {
 
   try {
     const body = await req.json();
+    const business = body.businessSlug
+      ? await resolveBusinessBySlug(body.businessSlug)
+      : undefined;
+    const companyNameFromBusiness = business?.name ?? body.companyName;
+
     const [existing] = await db.select().from(brandSettings).limit(1);
+
+    const payload = {
+      companyName: companyNameFromBusiness || "Intellee College",
+      logoUrl: body.logoUrl,
+      businessSlug: body.businessSlug || "intellee_college",
+      brandLibraryUrls: body.brandLibraryUrls ?? existing?.brandLibraryUrls ?? [],
+      headerBackgroundColor:
+        body.headerBackgroundColor ?? body.primaryColor ?? "#1E1B4B",
+      newsletterPageBackground:
+        body.newsletterPageBackground ?? "#F3F4F6",
+      newsletterCardBackground:
+        body.newsletterCardBackground ?? "#ffffff",
+      newsletterTextColor: body.newsletterTextColor ?? "#374151",
+      newsletterLinkColor:
+        body.newsletterLinkColor ?? body.accentColor ?? "#4338CA",
+      primaryColor:
+        body.headerBackgroundColor ?? body.primaryColor ?? "#1E1B4B",
+      accentColor:
+        body.newsletterLinkColor ?? body.accentColor ?? "#4338CA",
+      fontFamily: body.fontFamily,
+      address: body.address,
+      phone: body.phone,
+      websiteUrl: body.websiteUrl,
+      contactEmail: body.contactEmail,
+      socialLinks: body.socialLinks,
+      footerText: body.footerText,
+      brandGuidelines: body.brandGuidelines,
+      updatedAt: new Date(),
+    };
 
     if (existing) {
       const [updated] = await db
         .update(brandSettings)
-        .set({
-          companyName: body.companyName,
-          logoUrl: body.logoUrl,
-          businessSlug: body.businessSlug,
-          brandLibraryUrls: body.brandLibraryUrls ?? existing.brandLibraryUrls,
-          primaryColor: body.primaryColor,
-          accentColor: body.accentColor,
-          fontFamily: body.fontFamily,
-          address: body.address,
-          phone: body.phone,
-          websiteUrl: body.websiteUrl,
-          contactEmail: body.contactEmail,
-          socialLinks: body.socialLinks,
-          footerText: body.footerText,
-          brandGuidelines: body.brandGuidelines,
-          updatedAt: new Date(),
-        })
+        .set(payload)
         .where(eq(brandSettings.id, existing.id))
         .returning();
       return NextResponse.json({ settings: updated });
@@ -61,20 +80,7 @@ export async function PUT(req: Request) {
     const [created] = await db
       .insert(brandSettings)
       .values({
-        companyName: body.companyName || "Intellee College",
-        logoUrl: body.logoUrl,
-        businessSlug: body.businessSlug || "intellee_college",
-        brandLibraryUrls: body.brandLibraryUrls ?? [],
-        primaryColor: body.primaryColor || "#1E1B4B",
-        accentColor: body.accentColor || "#4338CA",
-        fontFamily: body.fontFamily,
-        address: body.address,
-        phone: body.phone,
-        websiteUrl: body.websiteUrl,
-        contactEmail: body.contactEmail,
-        socialLinks: body.socialLinks,
-        footerText: body.footerText,
-        brandGuidelines: body.brandGuidelines,
+        ...payload,
         createdBy: userId,
       })
       .returning();
@@ -98,6 +104,11 @@ function getDefaults(userId: string) {
     brandLibraryUrls: [] as string[],
     primaryColor: "#1E1B4B",
     accentColor: "#4338CA",
+    headerBackgroundColor: "#1E1B4B",
+    newsletterPageBackground: "#F3F4F6",
+    newsletterCardBackground: "#ffffff",
+    newsletterTextColor: "#374151",
+    newsletterLinkColor: "#4338CA",
     fontFamily: "Georgia, 'Times New Roman', Times, serif",
     address: "Tech Park, Bangalore, India",
     phone: "+91 98765 43210",

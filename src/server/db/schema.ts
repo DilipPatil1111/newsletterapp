@@ -326,16 +326,49 @@ export const suppressionList = pgTable("suppression_list", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Businesses (custom + overrides for newsletter labels) ─
+
+export const businesses = pgTable("businesses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 300 }).notNull(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  fieldLabel1: varchar("field_label_1", { length: 120 }).notNull(),
+  fieldLabel2: varchar("field_label_2", { length: 120 }).notNull(),
+  placeholder1: varchar("placeholder_1", { length: 400 }),
+  placeholder2: varchar("placeholder_2", { length: 400 }),
+  defaultAddress: text("default_address"),
+  defaultPhone: varchar("default_phone", { length: 50 }),
+  defaultWebsiteUrl: text("default_website_url"),
+  defaultContactEmail: varchar("default_contact_email", { length: 320 }),
+  generatePromptContext: text("generate_prompt_context").notNull(),
+  createdBy: varchar("created_by", { length: 200 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ─── Brand Settings ─────────────────────────────────────────
 
 export const brandSettings = pgTable("brand_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   businessSlug: varchar("business_slug", { length: 100 }).default("intellee_college"),
+  /** Denormalized display name — synced from selected business on save */
   companyName: varchar("company_name", { length: 300 }).default("Intellee College").notNull(),
   logoUrl: text("logo_url"),
   brandLibraryUrls: jsonb("brand_library_urls").default([]),
+  /** @deprecated Use headerBackgroundColor — kept for DB backward compatibility */
   primaryColor: varchar("primary_color", { length: 20 }).default("#1E1B4B").notNull(),
+  /** @deprecated Use newsletterLinkColor */
   accentColor: varchar("accent_color", { length: 20 }).default("#4338CA").notNull(),
+  /** Email header strip behind logo/title */
+  headerBackgroundColor: varchar("header_background_color", { length: 20 }).default("#1E1B4B").notNull(),
+  /** Outer table background in HTML email */
+  newsletterPageBackground: varchar("newsletter_page_background", { length: 20 }).default("#F3F4F6").notNull(),
+  /** Main content card background */
+  newsletterCardBackground: varchar("newsletter_card_background", { length: 20 }).default("#ffffff").notNull(),
+  /** Body copy color */
+  newsletterTextColor: varchar("newsletter_text_color", { length: 20 }).default("#374151").notNull(),
+  /** Links, buttons, footer accents */
+  newsletterLinkColor: varchar("newsletter_link_color", { length: 20 }).default("#4338CA").notNull(),
   fontFamily: varchar("font_family", { length: 200 }).default("Georgia, 'Times New Roman', Times, serif"),
   address: text("address").default("Tech Park, Bangalore, India"),
   phone: varchar("phone", { length: 30 }).default("+91 98765 43210"),
@@ -414,6 +447,7 @@ export type CampaignApproval = typeof campaignApprovals.$inferSelect;
 export type Schedule = typeof schedules.$inferSelect;
 export type SendJob = typeof sendJobs.$inferSelect;
 export type SendRecipient = typeof sendRecipients.$inferSelect;
+export type Business = typeof businesses.$inferSelect;
 export type BrandSettings = typeof brandSettings.$inferSelect;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
 export type AbVariant = typeof abVariants.$inferSelect;

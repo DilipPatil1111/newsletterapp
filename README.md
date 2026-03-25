@@ -39,11 +39,21 @@ Required variables:
 - `CRON_SECRET` — Secret for cron job authorization
 - `EXA_API_KEY` — (Optional) Exa API key for contact discovery
 
-### 3. Push database schema
+### 3. Apply database schema
+
+If the repo includes SQL migrations under `drizzle/`, apply them (recommended for production):
+
+```bash
+npm run db:migrate
+```
+
+Or sync the Drizzle schema directly (common for local dev):
 
 ```bash
 npm run db:push
 ```
+
+**If you see errors about missing tables/columns** (e.g. `businesses`, `brand_settings` columns), run `db:migrate` or `db:push` so the database matches `src/server/db/schema.ts`.
 
 ### 4. Run the dev server
 

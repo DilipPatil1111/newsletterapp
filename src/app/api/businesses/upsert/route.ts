@@ -4,22 +4,20 @@ import { businesses } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getAllBusinessesMerged } from "@/lib/businesses-service";
-import { clientSafeDbError } from "@/lib/db-errors";
 import {
   DEFAULT_TOPIC_FIELD_LABEL,
   DEFAULT_ORG_FIELD_LABEL,
   DEFAULT_BUSINESS_PROMPT_CONTEXT,
 } from "@/lib/business-defaults";
+import { clientSafeDbError } from "@/lib/db-errors";
 
-const createSchema = z.object({
-  name: z.string().min(1).max(300),
+const upsertSchema = z.object({
   slug: z
     .string()
     .min(2)
     .max(100)
-    .regex(/^[a-z0-9_]+$/, "Slug: lowercase letters, numbers, underscores only"),
-  /** Optional — defaults to Topic Name / Organization (set at newsletter creation if needed). */
+    .regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(300),
   fieldLabel1: z.string().max(120).optional(),
   fieldLabel2: z.string().max(120).optional(),
   placeholder1: z.string().optional(),
@@ -28,19 +26,10 @@ const createSchema = z.object({
   defaultPhone: z.string().optional(),
   defaultWebsiteUrl: z.string().optional(),
   defaultContactEmail: z.string().email().optional().or(z.literal("")),
-  /** Optional — generic default; topic-specific context is added when creating a newsletter. */
   generatePromptContext: z.string().max(4000).optional(),
 });
 
-export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const list = await getAllBusinessesMerged();
-  return NextResponse.json({ businesses: list });
-}
-
+/** Create or update a business row by slug (used to override built-in defaults). */
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -49,19 +38,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const data = createSchema.parse(body);
-
-    const [dup] = await db
-      .select({ id: businesses.id })
-      .from(businesses)
-      .where(eq(businesses.slug, data.slug))
-      .limit(1);
-    if (dup) {
-      return NextResponse.json(
-        { error: "A business with this slug already exists" },
-        { status: 409 }
-      );
-    }
+    const data = upsertSchema.parse(body);
 
     const fieldLabel1 =
       data.fieldLabel1?.trim() || DEFAULT_TOPIC_FIELD_LABEL;
@@ -70,11 +47,38 @@ export async function POST(req: Request) {
     const generatePromptContext =
       data.generatePromptContext?.trim() || DEFAULT_BUSINESS_PROMPT_CONTEXT;
 
-    const [row] = await db
+    const [existing] = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.slug, data.slug))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await db
+        .update(businesses)
+        .set({
+          name: data.name,
+          fieldLabel1,
+          fieldLabel2,
+          placeholder1: data.placeholder1 || null,
+          placeholder2: data.placeholder2 || null,
+          defaultAddress: data.defaultAddress || null,
+          defaultPhone: data.defaultPhone || null,
+          defaultWebsiteUrl: data.defaultWebsiteUrl || null,
+          defaultContactEmail: data.defaultContactEmail || null,
+          generatePromptContext,
+          updatedAt: new Date(),
+        })
+        .where(eq(businesses.id, existing.id))
+        .returning();
+      return NextResponse.json({ business: updated, created: false });
+    }
+
+    const [created] = await db
       .insert(businesses)
       .values({
-        name: data.name,
         slug: data.slug,
+        name: data.name,
         fieldLabel1,
         fieldLabel2,
         placeholder1: data.placeholder1 || null,
@@ -88,7 +92,7 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    return NextResponse.json({ business: row });
+    return NextResponse.json({ business: created, created: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -96,9 +100,9 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.error("Create business error:", error);
+    console.error("Upsert business error:", error);
     return NextResponse.json(
-      { error: clientSafeDbError(error, "Failed to create business") },
+      { error: clientSafeDbError(error, "Failed to save business") },
       { status: 500 }
     );
   }

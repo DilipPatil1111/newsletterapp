@@ -1,23 +1,15 @@
 import { render } from "@react-email/render";
-import { NewsletterTemplate, type ContentBlock } from "@/emails/newsletter-template";
+import {
+  NewsletterTemplate,
+  type ContentBlock,
+  type NewsletterBrandProps,
+} from "@/emails/newsletter-template";
 import type { Stat } from "@/emails/components/stats-bar";
 import type { SectionStyle } from "@/emails/components/section-block";
 import * as React from "react";
 
 export type { ContentBlock };
-
-export interface BrandSettings {
-  companyName?: string;
-  primaryColor?: string;
-  accentColor?: string;
-  logoUrl?: string;
-  address?: string;
-  phone?: string;
-  websiteUrl?: string;
-  contactEmail?: string;
-  socialLinks?: { label: string; url: string }[];
-  footerText?: string;
-}
+export type BrandSettings = NewsletterBrandProps;
 
 export interface RenderEmailOptions {
   subject: string;
@@ -28,7 +20,7 @@ export interface RenderEmailOptions {
   showStats?: boolean;
   stats?: Stat[];
   appUrl?: string;
-  brand?: BrandSettings;
+  brand?: NewsletterBrandProps;
 }
 
 export async function renderEmail(options: RenderEmailOptions): Promise<string> {
@@ -63,7 +55,7 @@ export async function renderEmailPlainText(options: RenderEmailOptions): Promise
 
 const SECTION_KEY_MAP: Record<string, { style: SectionStyle }> = {
   "WHAT'S HAPPENING": { style: "info" },
-  "SALARY": { style: "success" },
+  SALARY: { style: "success" },
   "WHY THE DEMAND": { style: "warning" },
   "WHAT YOU GET": { style: "purple" },
   "LEARN MORE": { style: "default" },
@@ -77,11 +69,6 @@ const SECTION_KEY_MAP: Record<string, { style: SectionStyle }> = {
   "EVENT DETAILS": { style: "info" },
 };
 
-/**
- * Converts raw newsletter text content (with section headers like "WHAT'S HAPPENING")
- * into structured ContentBlock array. This bridges the legacy plain-text format
- * with the new block-based system.
- */
 export function parseContentToBlocks(rawContent: string, ctaText?: string, ctaUrl?: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const sections = rawContent.split("\n\n");
@@ -122,9 +109,6 @@ export function parseContentToBlocks(rawContent: string, ctaText?: string, ctaUr
   return blocks;
 }
 
-/**
- * Converts ContentBlock array to raw text format (for storage/editing) and extracts CTA.
- */
 export function blocksToRawContent(
   blocks: ContentBlock[]
 ): { rawContent: string; ctaText: string; ctaUrl: string } {
@@ -150,9 +134,6 @@ export function blocksToRawContent(
   };
 }
 
-/**
- * Replaces {{courseName}} and {{firstName}} placeholders in blocks.
- */
 export function replacePlaceholdersInBlocks(
   blocks: ContentBlock[],
   replacements: { courseName?: string; firstName?: string }
@@ -179,10 +160,6 @@ export function replacePlaceholdersInBlocks(
   });
 }
 
-/**
- * Converts simple campaign content (intro, highlights, ctaText, ctaUrl)
- * into ContentBlock array.
- */
 export function campaignContentToBlocks(content: Record<string, string> | null): ContentBlock[] {
   const blocks: ContentBlock[] = [];
 
